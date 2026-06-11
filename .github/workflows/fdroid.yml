@@ -92,9 +92,13 @@ jobs:
           fdroid update --create-metadata --pretty
 
       - name: Publish to GitHub Pages
+        # Publish ONLY the repo dir — fdroid/config.yml contains the signing
+        # passwords and must never reach the public branch. force_orphan keeps
+        # gh-pages a single fresh commit per deploy (no history).
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./fdroid
+          publish_dir: ./fdroid/repo
+          destination_dir: repo
           publish_branch: gh-pages
           force_orphan: true
