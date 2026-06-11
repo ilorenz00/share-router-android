@@ -1,0 +1,11 @@
+<resources>
+    <!-- Base theme; the actual UI is drawn by Compose (ShareRouterTheme). -->
+    <style name="Theme.ShareRouter" parent="android:Theme.DeviceDefault.NoActionBar" />
+
+    <!-- ShareActivity floats over whatever the user was looking at. -->
+    <style name="Theme.ShareRouter.Transparent" parent="Theme.ShareRouter">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+</resources>

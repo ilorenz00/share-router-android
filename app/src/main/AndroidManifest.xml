@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- usesCleartextTraffic: LAN/homelab tool — the MasterAPI may be reached over
+         plain http on the local network (and 10.0.2.2 during emulator testing). -->
+    <application
+        android:name=".ShareRouterApp"
+        android:usesCleartextTraffic="true"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ShareRouter">
+
+        <!-- Settings / config screen -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Share target: accepts every MIME type via SEND / SEND_MULTIPLE -->
+        <!-- No singleTask: each share must get a fresh activity + ViewModel. A reused
+             singleTask instance would show the previous share's stale state, because
+             onNewIntent isn't handled and the URI grant is tied to the delivering intent. -->
+        <activity
+            android:name=".ShareActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ShareRouter.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          AppAuth's net.openid.appauth.RedirectUriReceiverActivity is contributed by the
+          appauth library manifest. It binds the "${appAuthRedirectScheme}" placeholder
+          (set in build.gradle.kts to "sharerouter"), so the OIDC redirect URI is
+          sharerouter:/oauth2redirect — register that as a valid redirect URI in Authentik.
+        -->
+
+    </application>
+</manifest>

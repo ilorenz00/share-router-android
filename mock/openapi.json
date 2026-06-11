@@ -1,0 +1,148 @@
+{
+  "openapi": "3.0.1",
+  "info": { "title": "Master API (Mock)", "version": "1.0.0" },
+  "servers": [{ "url": "/api/v1" }],
+  "paths": {
+    "/health": {
+      "get": { "operationId": "health", "summary": "Healthcheck", "responses": { "200": { "description": "OK" } } }
+    },
+    "/ai/img2img": {
+      "post": {
+        "operationId": "aiImg2Img",
+        "summary": "Stable Diffusion (img2img)",
+        "description": "Transform a shared image with Stable Diffusion.",
+        "tags": ["ai"],
+        "x-share-accepts": ["image"],
+        "x-share-style": "json",
+        "x-share-field": "init_images",
+        "x-share-defaults": { "prompt": "enhance", "steps": "20" },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Img2ImgRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/ai/image-to-text": {
+      "post": {
+        "operationId": "aiImageToText",
+        "summary": "OCR — image to text",
+        "tags": ["ai"],
+        "x-share-accepts": ["image"],
+        "x-share-field": "file",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": { "file": { "type": "string", "format": "binary" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/ai/speech-to-text": {
+      "post": {
+        "operationId": "aiSpeechToText",
+        "summary": "Whisper — speech to text",
+        "tags": ["ai"],
+        "x-share-accepts": ["audio"],
+        "x-share-field": "file",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": { "file": { "type": "string", "format": "binary" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/metube/add": {
+      "post": {
+        "operationId": "metubeAdd",
+        "summary": "MeTube — download video",
+        "tags": ["media"],
+        "x-share-accepts": ["url"],
+        "x-share-field": "url",
+        "x-share-url-hosts": ["youtube.com", "youtu.be"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "url": { "type": "string", "format": "uri" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/tasks": {
+      "post": {
+        "operationId": "createTask",
+        "summary": "Create automation task",
+        "tags": ["tasks"],
+        "x-share-accepts": ["text"],
+        "x-share-field": "payload",
+        "x-share-defaults": { "name": "shared-from-android", "type": "custom" },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/scrape/statistics/language/detect": {
+      "post": {
+        "operationId": "detectLanguage",
+        "summary": "Detect language",
+        "description": "Unannotated on purpose — matched via schema inference.",
+        "tags": ["scrape"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "text": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Img2ImgRequest": {
+        "type": "object",
+        "properties": {
+          "init_images": { "type": "array", "items": { "type": "string" } },
+          "prompt": { "type": "string" },
+          "steps": { "type": "integer" }
+        }
+      },
+      "TaskRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "payload": { "type": "string" }
+        }
+      }
+    }
+  }
+}

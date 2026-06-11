@@ -1,0 +1,100 @@
+{
+  "swagger": "2.0",
+  "info": { "title": "Master API", "version": "1.0.0" },
+  "basePath": "/api/v1",
+  "paths": {
+    "/health": {
+      "get": { "operationId": "health", "summary": "Healthcheck", "responses": { "200": { "description": "OK" } } }
+    },
+    "/ai/image-to-text": {
+      "post": {
+        "summary": "Bild zu Text (OCR)",
+        "tags": ["ai"],
+        "consumes": ["multipart/form-data"],
+        "produces": ["application/json"],
+        "parameters": [
+          { "type": "file", "name": "file", "in": "formData", "required": true, "description": "Bilddatei (PNG, JPG, WEBP)" }
+        ],
+        "x-share-accepts": ["image"],
+        "x-share-field": "file",
+        "x-share-style": "multipart",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/ai/speech-to-text": {
+      "post": {
+        "summary": "Sprache zu Text (Whisper)",
+        "tags": ["ai"],
+        "consumes": ["multipart/form-data"],
+        "parameters": [
+          { "type": "file", "name": "file", "in": "formData", "required": true }
+        ],
+        "x-share-accepts": ["audio"],
+        "x-share-field": "file",
+        "x-share-style": "multipart",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/ai/img2img": {
+      "post": {
+        "summary": "Bild zu Bild (Stable Diffusion)",
+        "tags": ["ai"],
+        "consumes": ["application/json"],
+        "parameters": [
+          { "name": "body", "in": "body", "required": true, "schema": { "$ref": "#/definitions/dto.Img2ImgRequest" } }
+        ],
+        "x-share-accepts": ["image"],
+        "x-share-field": "init_images",
+        "x-share-style": "json-array",
+        "x-share-defaults": { "prompt": "high quality, photorealistic", "denoising_strength": "0.5" },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/tasks": {
+      "post": {
+        "summary": "Neuen Task erstellen",
+        "tags": ["tasks"],
+        "consumes": ["application/json"],
+        "parameters": [
+          { "name": "task", "in": "body", "required": true, "schema": { "$ref": "#/definitions/dto.CreateTaskRequest" } }
+        ],
+        "x-share-accepts": ["text"],
+        "x-share-field": "payload",
+        "x-share-style": "json",
+        "x-share-defaults": { "name": "shared-from-android", "type": "custom" },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/scrape/statistics/language/detect": {
+      "post": {
+        "summary": "Detect language (langdetect)",
+        "description": "Unannotiert bis auf x-share — testet v2-Parsing.",
+        "tags": ["scrape-text"],
+        "consumes": ["application/json"],
+        "parameters": [
+          { "name": "body", "in": "body", "required": true, "schema": { "type": "object", "properties": { "text": { "type": "string" } } } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  },
+  "definitions": {
+    "dto.Img2ImgRequest": {
+      "type": "object",
+      "properties": {
+        "init_images": { "type": "array", "items": { "type": "string" } },
+        "prompt": { "type": "string" },
+        "denoising_strength": { "type": "number" },
+        "steps": { "type": "integer" }
+      }
+    },
+    "dto.CreateTaskRequest": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "payload": { "type": "string" }
+      }
+    }
+  }
+}
