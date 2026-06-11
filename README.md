@@ -160,11 +160,15 @@ annotations in the master-api swaggo comments). App settings for production:
 | Issuer URL | `https://auth.lorenzl5.com/application/o/share-router/` |
 | Client ID | `share-router` |
 | Scopes | `openid profile email offline_access` |
-| Token-Exchange Client ID | client_id of `masterapi-provider` (Authentik UI → Providers) |
+| Token-Exchange Client ID | leave blank — auto-discovered (override only if needed) |
 
 The token exchange (client_credentials + JWT-bearer client_assertion) is what
-lets a Bearer token pass the Traefik forwardAuth outpost — see
-`docs/manual-setup-steps.md` in the cluster repo.
+lets a Bearer token pass the Traefik forwardAuth outpost. The proxy provider's
+client_id is discovered automatically: an unauthenticated probe of the spec URL
+follows the outpost redirect chain (`…/outpost.goauthentik.io/start` →
+`…/application/o/authorize/?client_id=…`) and extracts the `client_id` query
+param — no Authentik API access needed. See `docs/manual-setup-steps.md` in the
+cluster repo.
 
 ---
 

@@ -81,8 +81,19 @@ class ShareViewModel(
         }
     }
 
-    private suspend fun tokenIfNeeded(settings: AppSettings): String? =
-        if (settings.usesAuth) container.auth.bearerToken(settings.exchangeClientId) else null
+    private suspend fun tokenIfNeeded(settings: AppSettings): String? {
+        if (!settings.usesAuth) return null
+        var exchangeId = settings.exchangeClientId
+        if (exchangeId.isBlank()) {
+            // Auto-discover the proxy provider's client_id from the forwardAuth
+            // redirect chain and persist it for subsequent shares.
+            exchangeId = container.auth.discoverProxyClientId(settings.specUrl).orEmpty()
+            if (exchangeId.isNotBlank()) {
+                container.settings.update(settings.copy(exchangeClientId = exchangeId))
+            }
+        }
+        return container.auth.bearerToken(exchangeId)
+    }
 
     class Factory(
         private val container: AppContainer,

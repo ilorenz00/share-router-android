@@ -28,6 +28,28 @@ while ($listener.IsListening) {
     Add-Content -Path $logPath -Value $line
     Write-Host $line
 
+    # Simulated Authentik forwardAuth: browser-ish probes of /protected/spec get the
+    # outpost redirect chain (start -> authorize?client_id=...), JSON fetches get the spec.
+    if ($req.Url.AbsolutePath -eq "/protected/spec" -and $req.Headers["Accept"] -match "text/html") {
+        $resp.StatusCode = 302
+        $resp.RedirectLocation = "/outpost.goauthentik.io/start?rd=%2Fprotected%2Fspec"
+        $resp.Close()
+        continue
+    }
+    if ($req.Url.AbsolutePath -eq "/outpost.goauthentik.io/start") {
+        $resp.StatusCode = 302
+        $resp.RedirectLocation = "http://10.0.2.2:$Port/application/o/authorize/?client_id=mock-proxy-123&redirect_uri=callback&response_type=code"
+        $resp.Close()
+        continue
+    }
+    if ($req.Url.AbsolutePath -eq "/protected/spec") {
+        $bytes = [System.IO.File]::ReadAllBytes((Join-Path $root "swagger2.json"))
+        $resp.ContentType = "application/json"
+        $resp.OutputStream.Write($bytes, 0, $bytes.Length)
+        $resp.Close()
+        continue
+    }
+
     if ($req.Url.AbsolutePath -in @("/openapi.json", "/swagger2.json")) {
         $file = if ($req.Url.AbsolutePath -eq "/swagger2.json") { Join-Path $root "swagger2.json" } else { $specPath }
         $bytes = [System.IO.File]::ReadAllBytes($file)

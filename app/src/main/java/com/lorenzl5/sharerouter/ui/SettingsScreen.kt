@@ -125,7 +125,7 @@ fun SettingsScreen(vm: SettingsViewModel) {
             Field("Scopes", scopes.orEmpty(), KeyboardType.Text) { scopes = it }
             Field(
                 "Token-Exchange Client ID (optional)", exchangeId.orEmpty(), KeyboardType.Text,
-                supporting = "Client ID of the forward-auth proxy provider (Authentik) guarding the API host.",
+                supporting = "Leave blank — auto-discovered from the forwardAuth redirect of the API host. Fill only to override.",
             ) { exchangeId = it }
             Text(
                 "Redirect URI to register in Authentik:  sharerouter:/oauth2redirect",

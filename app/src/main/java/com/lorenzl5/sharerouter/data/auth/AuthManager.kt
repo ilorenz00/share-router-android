@@ -80,6 +80,42 @@ class AuthManager(context: Context, private val http: OkHttpClient) {
     }
 
     /**
+     * Discovers the forward-auth proxy provider's client_id without any login:
+     * an unauthenticated probe of the API host gets redirected by the Authentik
+     * outpost (… → /outpost.goauthentik.io/start → /application/o/authorize/
+     * ?client_id=<proxy-provider>…); the authorize URL carries the client_id.
+     * Returns null if the host never redirects to an authorize URL (e.g. not
+     * behind forward-auth at all).
+     */
+    suspend fun discoverProxyClientId(probeUrl: String): String? = withContext(Dispatchers.IO) {
+        val noRedirect = http.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
+        var url = probeUrl
+        repeat(5) {
+            val resp = try {
+                noRedirect.newCall(
+                    Request.Builder().url(url).header("Accept", "text/html").build()
+                ).execute()
+            } catch (e: Exception) {
+                return@withContext null
+            }
+            resp.use {
+                if (it.code !in 300..399) return@withContext null
+                val location = it.header("Location") ?: return@withContext null
+                val resolved = it.request.url.resolve(location)?.toString()
+                    ?: return@withContext null
+                Uri.parse(resolved).getQueryParameter("client_id")
+                    ?.takeIf { id -> id.isNotBlank() }
+                    ?.let { id -> return@withContext id }
+                url = resolved
+            }
+        }
+        null
+    }
+
+    /**
      * Returns the token to send as `Authorization: Bearer` to the MasterAPI.
      *
      * Authentik's forward-auth outpost only accepts access tokens issued by the

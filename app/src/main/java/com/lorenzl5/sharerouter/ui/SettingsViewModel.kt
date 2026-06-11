@@ -29,16 +29,30 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     /** Fetch the spec and summarize what would be exposed. */
     suspend fun test(s: AppSettings): String {
         container.settings.update(s)
-        val bearer = if (s.usesAuth) container.auth.bearerToken(s.exchangeClientId) else null
-        val spec = container.fetcher.fetch(s.specUrl, bearer)
+
+        // Without an explicit exchange client_id, derive it from the forwardAuth
+        // redirect chain (works pre-login, no Authentik API needed) and persist it.
+        var effective = s
+        var exchangeNote = ""
+        if (s.exchangeClientId.isBlank()) {
+            val discovered = container.auth.discoverProxyClientId(s.specUrl)
+            if (discovered != null) {
+                effective = s.copy(exchangeClientId = discovered)
+                container.settings.update(effective)
+                exchangeNote = "\nToken-Exchange client_id auto-discovered: $discovered"
+            }
+        }
+
+        val bearer = if (effective.usesAuth) container.auth.bearerToken(effective.exchangeClientId) else null
+        val spec = container.fetcher.fetch(effective.specUrl, bearer)
         if (spec.endpoints.isEmpty()) {
             return "Connected to “${spec.title}”, but no operation accepts shareable input.\n" +
-                "Annotate operations with x-share-accepts (see README)."
+                "Annotate operations with x-share-accepts (see README)." + exchangeNote
         }
         val lines = spec.endpoints.joinToString("\n") { ep ->
             "• ${ep.title} — ${ep.accepts.joinToString { k -> k.name.lowercase() }} (${ep.method} ${ep.path})"
         }
-        return "“${spec.title}” → base ${spec.baseUrl}\n${spec.endpoints.size} endpoint(s):\n$lines"
+        return "“${spec.title}” → base ${spec.baseUrl}\n${spec.endpoints.size} endpoint(s):\n$lines$exchangeNote"
     }
 
     class Factory(private val container: AppContainer) : ViewModelProvider.Factory {
