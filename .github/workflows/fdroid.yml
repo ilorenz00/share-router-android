@@ -37,7 +37,8 @@ jobs:
           gradle-version: "8.7"
 
       - name: Decode signing keystore
-        run: echo "${{ secrets.SIGNING_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+        # tr strips any CR/whitespace a Windows-side `gh secret set` may have added
+        run: echo "${{ secrets.SIGNING_KEYSTORE_B64 }}" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/release.jks"
 
       - name: Build signed release APK
         env:
