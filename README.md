@@ -152,7 +152,10 @@ Setup (already done once, documented for disaster recovery):
 
 The cluster side lives in `k3s_cluster_l5` (Authentik blueprint
 `share-router-oidc` + JWT federation on `masterapi-provider`; x-share
-annotations in the master-api swaggo comments). App settings for production:
+annotations in the master-api swaggo comments).
+
+**A fresh install ships with these values pre-filled** (`Defaults` in
+`SettingsStore.kt`) — on a new device just open the app, tap **Login**, done:
 
 | Field | Value |
 |---|---|

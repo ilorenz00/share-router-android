@@ -69,7 +69,7 @@ fun SettingsScreen(vm: SettingsViewModel) {
         baseUrlOverride = baseUrl.orEmpty(),
         oidcIssuer = issuer.orEmpty(),
         oidcClientId = clientId.orEmpty(),
-        oidcScopes = scopes.orEmpty().ifBlank { "openid profile email offline_access" },
+        oidcScopes = scopes.orEmpty().ifBlank { com.lorenzl5.sharerouter.data.settings.Defaults.OIDC_SCOPES },
         exchangeClientId = exchangeId.orEmpty(),
     )
 
