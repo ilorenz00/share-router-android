@@ -1,13 +1,17 @@
-# Builds a signed release APK and publishes it as an F-Droid repository on
-# GitHub Pages. Subscribe in the F-Droid client with:
-#   https://<owner>.github.io/share-router-android/repo
+# Builds a signed release APK and publishes it as a GitHub Release.
+# The CENTRAL F-Droid repo (ilorenz00/fdroid-lorenzl5) picks up the latest
+# release of every app repo on its schedule and serves all apps under ONE
+# subscription URL:
+#   https://ilorenz00.github.io/fdroid-lorenzl5/repo
 #
-# Required repository secrets (set once, see README "F-Droid repo"):
+# Required repository secrets:
 #   SIGNING_KEYSTORE_B64    base64 of the release keystore (.jks)
 #   SIGNING_STORE_PASSWORD  keystore password
 #   SIGNING_KEY_ALIAS       key alias
 #   SIGNING_KEY_PASSWORD    key password
-name: fdroid-repo
+# Optional: DISPATCH_TOKEN (PAT, repo scope on fdroid-lorenzl5) for instant
+# central-repo rebuilds instead of waiting for its 30-min schedule.
+name: release-apk
 
 on:
   push:
@@ -15,14 +19,14 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: fdroid-repo
+  group: release-apk
   cancel-in-progress: false
 
 permissions:
-  contents: write   # peaceiris/actions-gh-pages pushes the gh-pages branch
+  contents: write   # gh release create
 
 jobs:
-  build-and-publish:
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,55 +54,28 @@ jobs:
           VERSION_NAME: 0.1.${{ github.run_number }}
         run: gradle assembleRelease --no-daemon
 
-      - name: Install fdroidserver
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fdroidserver imagemagick
-
-      - name: Assemble F-Droid repo
+      - name: Publish GitHub Release
         env:
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p fdroid/repo
           cp app/build/outputs/apk/release/app-release.apk \
-             "fdroid/repo/sharerouter_${{ github.run_number }}.apk"
+             "sharerouter_${{ github.run_number }}.apk"
+          gh release create "v0.1.${{ github.run_number }}" \
+            "sharerouter_${{ github.run_number }}.apk" \
+            --title "Share Router 0.1.${{ github.run_number }}" \
+            --notes "Automated release (run ${{ github.run_number }}, ${{ github.sha }})" \
+            --latest
 
-          # Repo icon (F-Droid index wants one); plain brand-blue square.
-          mkdir -p fdroid/repo/icons
-          convert -size 512x512 xc:'#1F6FEB' fdroid/icon.png
-          cp fdroid/icon.png fdroid/repo/icons/icon.png
-
-          OWNER_REPO="${{ github.repository }}"
-          OWNER="${OWNER_REPO%%/*}"
-          NAME="${OWNER_REPO##*/}"
-          cat > fdroid/config.yml <<EOF
-          repo_url: https://${OWNER}.github.io/${NAME}/repo
-          repo_name: Share Router (lorenzl5)
-          repo_icon: icon.png
-          repo_description: >-
-            Personal F-Droid repo serving the Share Router app — an Android
-            share target that routes shared content to MasterAPI endpoints.
-          archive_older: 0
-          keystore: $RUNNER_TEMP/release.jks
-          repo_keyalias: $SIGNING_KEY_ALIAS
-          keystorepass: $SIGNING_STORE_PASSWORD
-          keypass: $SIGNING_KEY_PASSWORD
-          keydname: CN=lorenzl5 Share Router
-          EOF
-
-          cd fdroid
-          fdroid update --create-metadata --pretty
-
-      - name: Publish to GitHub Pages
-        # Publish ONLY the repo dir — fdroid/config.yml contains the signing
-        # passwords and must never reach the public branch. force_orphan keeps
-        # gh-pages a single fresh commit per deploy (no history).
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./fdroid/repo
-          destination_dir: repo
-          publish_branch: gh-pages
-          force_orphan: true
+      - name: Trigger central F-Droid repo rebuild (optional)
+        env:
+          DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$DISPATCH_TOKEN" ]; then
+            echo "no DISPATCH_TOKEN — central repo rebuilds on its 30-min schedule"
+            exit 0
+          fi
+          curl -sf -X POST \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/ilorenz00/fdroid-lorenzl5/dispatches \
+            -d '{"event_type":"app-updated"}'

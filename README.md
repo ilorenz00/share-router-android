@@ -122,29 +122,31 @@ the label, the target field, and host filtering.
 
 ---
 
-## F-Droid repo (CI)
+## F-Droid distribution (CI)
 
 Every push to `main` runs `.github/workflows/fdroid.yml`: it builds a **signed
-release APK** (versionCode = CI run number, so updates roll automatically), wraps
-it in an F-Droid repository via `fdroidserver`, and publishes it to GitHub Pages.
+release APK** (versionCode = CI run number, so updates roll automatically) and
+publishes it as a GitHub Release. The **central F-Droid repo**
+([`ilorenz00/fdroid-lorenzl5`](https://github.com/ilorenz00/fdroid-lorenzl5))
+collects the latest release of every lorenzl5 app on a 30-min schedule and
+serves them all under one subscription URL.
 
-**Subscribe on the phone:** F-Droid app → Settings → Repositories → `+` →
+**Subscribe on the phone (once, covers all lorenzl5 apps):**
+F-Droid app → Settings → Repositories → `+` →
 
 ```
-https://ilorenz00.github.io/share-router-android/repo
+https://ilorenz00.github.io/fdroid-lorenzl5/repo
 ```
-
-then install/update *Share Router* like any other F-Droid app.
 
 Setup (already done once, documented for disaster recovery):
 
 - Release keystore: `D:\android\sharerouter-release.jks` (alias `sharerouter`,
   credentials in `D:\android\sharerouter-keystore-credentials.txt` → password
-  manager). **Losing it means F-Droid clients reject future updates** (signature
-  change) — back it up.
-- Repository secrets: `SIGNING_KEYSTORE_B64`, `SIGNING_STORE_PASSWORD`,
-  `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
-- GitHub Pages serves the `gh-pages` branch (pushed by the workflow).
+  manager). Shared with the central repo for index signing. **Losing it means
+  F-Droid clients reject future updates** (signature change) — back it up.
+- Repository secrets (here AND in fdroid-lorenzl5): `SIGNING_KEYSTORE_B64`,
+  `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
+- Optional `DISPATCH_TOKEN` secret for instant central-repo rebuilds.
 
 ---
 
