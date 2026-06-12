@@ -144,6 +144,10 @@ class AuthManager(context: Context, private val http: OkHttpClient) {
                 .add("client_id", exchangeClientId)
                 .add("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
                 .add("client_assertion", access)
+                // Without scopes the issued token has an empty claim set — the
+                // outpost then writes an empty X-authentik-username and the API
+                // rejects the request. ak_proxy is the proxy provider's own scope.
+                .add("scope", "openid profile email ak_proxy")
                 .build()
             val req = Request.Builder().url(tokenEndpoint).post(form).build()
             http.newCall(req).execute().use { resp ->
