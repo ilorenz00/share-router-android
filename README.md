@@ -190,10 +190,12 @@ dependency (`androidx.work:work-runtime-ktx`).
 
 Every push to `main` runs `.github/workflows/fdroid.yml`: it builds a **signed
 release APK** (versionCode = CI run number, so updates roll automatically) and
-publishes it as a GitHub Release. The **central F-Droid repo**
-([`ilorenz00/fdroid-lorenzl5`](https://github.com/ilorenz00/fdroid-lorenzl5))
-collects the latest release of every lorenzl5 app on a 30-min schedule and
-serves them all under one subscription URL.
+publishes it as a GitHub Release. It then **instantly triggers** the **central
+F-Droid repo** ([`ilorenz00/fdroid-lorenzl5`](https://github.com/ilorenz00/fdroid-lorenzl5))
+via a `repository_dispatch` (`DISPATCH_TOKEN`, see below), which rebuilds and
+republishes the index — so a single push propagates **all the way to the phone
+with no manual step**. (Absent the token, the central repo still picks it up on
+its 30-min schedule.) All apps live under one subscription URL.
 
 **Subscribe on the phone (once, covers all lorenzl5 apps):**
 F-Droid app → Settings → Repositories → `+` →
@@ -210,7 +212,12 @@ Setup (already done once, documented for disaster recovery):
   F-Droid clients reject future updates** (signature change) — back it up.
 - Repository secrets (here AND in fdroid-lorenzl5): `SIGNING_KEYSTORE_B64`,
   `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
-- Optional `DISPATCH_TOKEN` secret for instant central-repo rebuilds.
+- `DISPATCH_TOKEN` secret (**configured**): a PAT that lets this repo's release
+  workflow trigger the central repo's rebuild instantly. Required permission:
+  fine-grained PAT with **Contents: Read and write** on `fdroid-lorenzl5` (or a
+  classic PAT with `repo` scope). The dispatch API (`POST /repos/.../dispatches`)
+  rejects anything less with `403 contents=write`. Rotate by re-running
+  `gh secret set DISPATCH_TOKEN -R ilorenz00/share-router-android`.
 
 ---
 
