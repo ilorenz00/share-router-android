@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,15 +29,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.lorenzl5.sharerouter.data.export.ResponseExport
 import com.lorenzl5.sharerouter.data.export.mimeFor
 import com.lorenzl5.sharerouter.data.export.suggestedFileName
 import com.lorenzl5.sharerouter.data.history.ResponseRecord
 import android.widget.Toast
+import java.io.File
 import java.text.DateFormat
 import java.util.Date
 
@@ -110,36 +114,58 @@ private fun HistoryCard(record: ResponseRecord, onDelete: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.size(8.dp))
-            Text(
-                text = record.body.ifBlank { "(empty response)" },
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 12,
-                overflow = TextOverflow.Ellipsis,
-            )
+            val imageFile = record.imagePath?.let { File(it) }?.takeIf { it.exists() }
+            if (imageFile != null) {
+                AsyncImage(
+                    model = imageFile,
+                    contentDescription = "Result image",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                )
+                if (record.body.isNotBlank()) {
+                    Spacer(Modifier.size(6.dp))
+                    Text(record.body, style = MaterialTheme.typography.bodySmall)
+                }
+            } else {
+                Text(
+                    text = record.body.ifBlank { if (record.pending) "⏳ läuft…" else "(empty response)" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 12,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Spacer(Modifier.size(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = {
-                    ResponseExport.copyToClipboard(context, "API response", record.body)
-                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                }) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Copy")
-                }
-                TextButton(onClick = {
-                    val name = ResponseExport.saveToDownloads(
-                        context, suggestedFileName(record), record.body, mimeFor(record),
-                    )
-                    val msg = if (name != null) "Saved to Downloads/$name" else "Save failed"
-                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                }) {
-                    Icon(Icons.Default.Download, contentDescription = null, Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Save")
+                if (!record.pending) {
+                    TextButton(onClick = {
+                        ResponseExport.copyToClipboard(context, "API response", record.body)
+                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("Copy")
+                    }
+                    TextButton(onClick = {
+                        val name = if (imageFile != null) {
+                            ResponseExport.saveBytesToDownloads(
+                                context, "sharerouter-${record.timestamp}.png", imageFile.readBytes(), "image/png",
+                            )
+                        } else {
+                            ResponseExport.saveToDownloads(
+                                context, suggestedFileName(record), record.body, mimeFor(record),
+                            )
+                        }
+                        val msg = if (name != null) "Saved to Downloads/$name" else "Save failed"
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                    }) {
+                        Icon(Icons.Default.Download, contentDescription = null, Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("Save")
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onDelete) {

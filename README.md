@@ -154,6 +154,36 @@ the history works regardless of the answer). Implementation lives in
 `ui/HistoryScreen.kt`; the response flows from `Dispatcher` (now returns the
 full body + `Content-Type`) through `ShareViewModel.recordResponse()`.
 
+### Async jobs (shared GPU queue): the result arrives by notification
+
+The cluster shares a few GPUs, so some endpoints don't answer directly — while
+the model loads into VRAM they **enqueue a job and return a ticket**, e.g.:
+
+```json
+{"ticket":"gpu_2ae005a8…","status":"queued","priority":1}
+```
+
+When the app sees a `{"ticket":…,"status":…}` body it does **not** treat that as
+the result. Instead it:
+
+1. writes a **pending** history entry and shows "⏳ In Bearbeitung" in the share sheet,
+2. schedules a **WorkManager** job (`work/JobTicketWorker.kt`) that polls
+   `GET /api/v2/gpu/jobs/{ticket}` until the status is `done` / `failed` /
+   `cancelled` — it survives the share sheet closing and process death, and resumes
+   past WorkManager's ~10-min execution cap via `Result.retry()`,
+3. on `done`, renders the result **generically**: if it decodes to an image
+   (Stable Diffusion's `{"images":["<base64>"]}`, a `data:image…;base64,` URI, or a
+   bare base64 blob) it shows the **generated image** in the notification
+   (BigPicture) and the history; otherwise it shows the text/JSON result.
+
+This is **queue-agnostic** — it works for any kind that returns a ticket (`sd`,
+`ephemeral`, future kinds). A new result media type only needs its own branch in
+`extractImageBytes()` (`data/export/ResponseExport.kt`). The poll URL is derived
+from the API host (`{origin}/api/v2/gpu/jobs/{ticket}`), independent of the spec
+basePath. The notification and the history entry both offer **Save** (image →
+`Downloads/*.png`, text → `Downloads/*.txt|json`). Requires the WorkManager
+dependency (`androidx.work:work-runtime-ktx`).
+
 ---
 
 ## F-Droid distribution (CI)

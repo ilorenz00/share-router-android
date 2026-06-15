@@ -112,6 +112,14 @@ fun ShareSheetScreen(
                 }
 
                 is ShareUiState.Done -> DoneBlock(s.endpoint, s.result, onDismiss)
+
+                is ShareUiState.Queued -> StatusBlock(
+                    title = "⏳ In Bearbeitung",
+                    body = "Der GPU-Job läuft (Ticket ${s.ticket}). Sobald das Ergebnis fertig " +
+                        "ist, bekommst du eine Benachrichtigung — und es liegt im Verlauf.",
+                    actionLabel = "OK",
+                    onAction = onDismiss,
+                )
             }
         }
     }

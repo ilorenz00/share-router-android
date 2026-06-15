@@ -20,9 +20,15 @@ data class ResponseRecord(
     val requestSummary: String,
     val httpCode: Int,
     val ok: Boolean,
-    /** Full response body returned by the API. */
+    /** Full response body returned by the API (or job result / status text). */
     val body: String,
     val contentType: String? = null,
+    /** Absolute path of a decoded result image in filesDir, if the result is an image. */
+    val imagePath: String? = null,
+    /** True while an async job (ticket) is still queued/running — final result pending. */
+    val pending: Boolean = false,
+    /** Ticket id of the async job this record tracks, if any. */
+    val ticket: String? = null,
 )
 
 /**
@@ -43,6 +49,18 @@ class HistoryStore(context: Context) {
 
     fun add(record: ResponseRecord): Unit = synchronized(lock) {
         val updated = (listOf(record) + _records.value).take(MAX_ENTRIES)
+        _records.value = updated
+        writeToDisk(updated)
+    }
+
+    /** Replace an existing record (same id) in place, or insert it at the front. */
+    fun upsert(record: ResponseRecord): Unit = synchronized(lock) {
+        val current = _records.value
+        val updated = if (current.any { it.id == record.id }) {
+            current.map { if (it.id == record.id) record else it }
+        } else {
+            (listOf(record) + current).take(MAX_ENTRIES)
+        }
         _records.value = updated
         writeToDisk(updated)
     }

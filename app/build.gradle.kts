@@ -86,6 +86,8 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.browser)
+    // Background polling of async GPU job tickets (survives the share sheet closing).
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.appauth)

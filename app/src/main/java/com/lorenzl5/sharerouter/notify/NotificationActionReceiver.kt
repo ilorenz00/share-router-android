@@ -8,6 +8,7 @@ import com.lorenzl5.sharerouter.container
 import com.lorenzl5.sharerouter.data.export.ResponseExport
 import com.lorenzl5.sharerouter.data.export.mimeFor
 import com.lorenzl5.sharerouter.data.export.suggestedFileName
+import java.io.File
 
 /** Handles the Copy / Save action buttons on the response notification. */
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -22,9 +23,16 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
             }
             Notifications.ACTION_SAVE -> {
-                val name = ResponseExport.saveToDownloads(
-                    context, suggestedFileName(record), record.body, mimeFor(record),
-                )
+                val imageFile = record.imagePath?.let { File(it) }
+                val name = if (imageFile != null && imageFile.exists()) {
+                    ResponseExport.saveBytesToDownloads(
+                        context, "sharerouter-${record.timestamp}.png", imageFile.readBytes(), "image/png",
+                    )
+                } else {
+                    ResponseExport.saveToDownloads(
+                        context, suggestedFileName(record), record.body, mimeFor(record),
+                    )
+                }
                 val msg = if (name != null) "Saved to Downloads/$name" else "Save failed"
                 Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
             }
