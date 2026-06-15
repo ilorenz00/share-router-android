@@ -10,13 +10,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -30,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,7 +47,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: SettingsViewModel) {
+fun SettingsScreen(vm: SettingsViewModel, onOpenHistory: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val persisted by vm.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
 
@@ -99,7 +105,18 @@ fun SettingsScreen(vm: SettingsViewModel) {
         }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Share Router") }) }) { pad ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Share Router") },
+                actions = {
+                    IconButton(onClick = onOpenHistory) {
+                        Icon(Icons.Default.History, contentDescription = "History")
+                    }
+                },
+            )
+        },
+    ) { pad ->
         Column(
             Modifier
                 .padding(pad)
@@ -108,31 +125,7 @@ fun SettingsScreen(vm: SettingsViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionTitle("MasterAPI")
-            Field("OpenAPI spec URL", specUrl.orEmpty(), KeyboardType.Uri) { specUrl = it }
-            Field(
-                "Base URL override (optional)", baseUrl.orEmpty(), KeyboardType.Uri,
-                supporting = "Leave blank to use servers[0].url from the spec.",
-            ) { baseUrl = it }
-
-            HorizontalDivider()
-            SectionTitle("Authentik / OIDC")
-            Field(
-                "Issuer URL", issuer.orEmpty(), KeyboardType.Uri,
-                supporting = "e.g. https://auth.lorenzl5.com/application/o/share-router/",
-            ) { issuer = it }
-            Field("Client ID", clientId.orEmpty(), KeyboardType.Text) { clientId = it }
-            Field("Scopes", scopes.orEmpty(), KeyboardType.Text) { scopes = it }
-            Field(
-                "Token-Exchange Client ID (optional)", exchangeId.orEmpty(), KeyboardType.Text,
-                supporting = "Leave blank — auto-discovered from the forwardAuth redirect of the API host. Fill only to override.",
-            ) { exchangeId = it }
-            Text(
-                "Redirect URI to register in Authentik:  sharerouter:/oauth2redirect",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
+            // 1) Login (Authentik) — primary first step, OIDC config tucked below.
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     enabled = !busy && current().usesAuth,
@@ -150,7 +143,7 @@ fun SettingsScreen(vm: SettingsViewModel) {
                             }
                         }
                     },
-                ) { Text(if (authorized) "Re-login" else "Login") }
+                ) { Text(if (authorized) "Re-login Authentik" else "Login Authentik") }
 
                 if (authorized) {
                     OutlinedButton(
@@ -160,20 +153,32 @@ fun SettingsScreen(vm: SettingsViewModel) {
                 }
             }
 
-            HorizontalDivider()
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    enabled = !busy && specUrl?.isNotBlank() == true,
-                    onClick = {
-                        scope.launch {
-                            busy = true
-                            status = "Saved ✓"
-                            vm.save(current())
-                            busy = false
-                        }
-                    },
-                ) { Text("Save") }
+            ExpandableSection("config Authentik / OIDC") {
+                Field(
+                    "Issuer URL", issuer.orEmpty(), KeyboardType.Uri,
+                    supporting = "e.g. https://auth.lorenzl5.com/application/o/share-router/",
+                ) { issuer = it }
+                Field("Client ID", clientId.orEmpty(), KeyboardType.Text) { clientId = it }
+                Field("Scopes", scopes.orEmpty(), KeyboardType.Text) { scopes = it }
+                Field(
+                    "Token-Exchange Client ID (optional)", exchangeId.orEmpty(), KeyboardType.Text,
+                    supporting = "Leave blank — auto-discovered from the forwardAuth redirect of the API host. Fill only to override.",
+                ) { exchangeId = it }
+                Text(
+                    "Redirect URI to register in Authentik:  sharerouter:/oauth2redirect",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
+            HorizontalDivider()
+
+            // 2) Reachability check — "Tailscale aktiv?" + Test, MasterAPI config below.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Tailscale aktiv?", style = MaterialTheme.typography.titleMedium)
                 OutlinedButton(
                     enabled = !busy && specUrl?.isNotBlank() == true,
                     onClick = {
@@ -189,11 +194,30 @@ fun SettingsScreen(vm: SettingsViewModel) {
                             }
                         }
                     },
-                ) { Text("Test connection") }
+                ) { Text("Test") }
+            }
+
+            ExpandableSection("config MasterAPI") {
+                Field("OpenAPI spec URL", specUrl.orEmpty(), KeyboardType.Uri) { specUrl = it }
+                Field(
+                    "Base URL override (optional)", baseUrl.orEmpty(), KeyboardType.Uri,
+                    supporting = "Leave blank to use servers[0].url from the spec.",
+                ) { baseUrl = it }
+                Button(
+                    enabled = !busy && specUrl?.isNotBlank() == true,
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            status = "Saved ✓"
+                            vm.save(current())
+                            busy = false
+                        }
+                    },
+                ) { Text("Save") }
             }
 
             if (busy) {
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(18.dp))
                 }
             }
@@ -218,9 +242,34 @@ fun SettingsScreen(vm: SettingsViewModel) {
     }
 }
 
+/** Collapsed-by-default config panel with a tappable header + chevron. */
 @Composable
-private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium)
+private fun ExpandableSection(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(if (expanded) "▾" else "▸", style = MaterialTheme.typography.titleMedium)
+        }
+        if (expanded) {
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                content()
+            }
+        }
+    }
 }
 
 @Composable

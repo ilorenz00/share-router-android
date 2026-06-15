@@ -5,10 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.lorenzl5.sharerouter.AppContainer
 import com.lorenzl5.sharerouter.data.SharedContent
+import com.lorenzl5.sharerouter.data.history.ResponseRecord
 import com.lorenzl5.sharerouter.data.net.DispatchResult
 import com.lorenzl5.sharerouter.data.openapi.Endpoint
 import com.lorenzl5.sharerouter.data.openapi.EndpointMatcher
 import com.lorenzl5.sharerouter.data.settings.AppSettings
+import com.lorenzl5.sharerouter.notify.Notifications
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -74,11 +77,29 @@ class ShareViewModel(
                     container.fetcher.fetch(settings.specUrl, bearer).baseUrl
                 }
                 val result = container.dispatcher.send(endpoint, content, base, bearer)
+                recordResponse(endpoint, result)
                 _state.value = ShareUiState.Done(endpoint, result)
             } catch (e: Exception) {
                 _state.value = ShareUiState.Error(e.message ?: "Send failed")
             }
         }
+    }
+
+    /** Persist the response to history and raise the notification (Copy / Save actions). */
+    private fun recordResponse(endpoint: Endpoint, result: DispatchResult) {
+        val record = ResponseRecord(
+            id = UUID.randomUUID().toString(),
+            timestamp = System.currentTimeMillis(),
+            endpointTitle = endpoint.title,
+            requestSummary = content.primaryText?.take(120)
+                ?: content.kinds.joinToString { it.name.lowercase() },
+            httpCode = result.code,
+            ok = result.ok,
+            body = result.body.ifBlank { result.message },
+            contentType = result.contentType,
+        )
+        container.history.add(record)
+        Notifications.notifyResponse(container.appContext, record)
     }
 
     private suspend fun tokenIfNeeded(settings: AppSettings): String? {

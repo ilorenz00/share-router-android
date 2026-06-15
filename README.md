@@ -111,14 +111,48 @@ the label, the target field, and host filtering.
    - Note the **Issuer URL** (e.g. `https://auth.lorenzl5.com/application/o/share-router/`)
      and **Client ID**.
 
-3. **In the app** (launcher icon → Settings):
-   - **OpenAPI spec URL** — where your MasterAPI serves its OpenAPI JSON.
-   - **Base URL override** — optional; defaults to `servers[0].url` from the spec.
-   - **Issuer URL**, **Client ID**, **Scopes** (`openid profile email` by default).
-   - Tap **Login** → Authentik in the browser → back to the app.
-   - **Test connection** lists every endpoint that would be exposed and how it was matched.
+3. **In the app** (launcher icon → Settings). The screen is ordered for the
+   normal flow — actions first, configuration collapsed into dropdowns:
+   - **Login Authentik** (top) → Authentik in the browser → back to the app.
+     The OIDC config (**Issuer URL**, **Client ID**, **Scopes**) lives in the
+     collapsed **config Authentik / OIDC** dropdown right below it.
+   - **Tailscale aktiv?** + **Test** — verifies the app can reach and read the
+     MasterAPI spec (network/Tailscale + auth) and lists every endpoint that
+     would be exposed and how it was matched. The **OpenAPI spec URL** and
+     **Base URL override** live in the collapsed **config MasterAPI** dropdown.
+   - The toolbar **History** icon opens the response history (see below).
 
 4. **Use it**: in any app, *Share → Share Router*, pick the endpoint, done.
+
+---
+
+## Responses: notification, history, copy & save
+
+Every time you share to an endpoint, the MasterAPI's **response** is captured and:
+
+- shown inline in the share sheet with **Copy** / **Save** buttons, and
+- posted as a **notification** (channel *API responses*) carrying the same
+  **Copy** (to clipboard) and **Save** (to `Downloads/`) actions. Tapping the
+  notification opens the in-app history.
+
+The full response body is persisted to a local **history** (JSON in the app's
+`filesDir`, newest first, capped at 200 entries) — open it from the toolbar
+**History** icon or a notification tap. Even after the notification is
+dismissed, each entry still offers **Copy** and **Save**, and can be deleted
+individually or via **Clear all**.
+
+Saved files land in the public **Downloads** directory as
+`sharerouter-<timestamp>.<ext>` (extension from the response `Content-Type`:
+`json` / `xml` / `html` / `csv` / `txt`) — via MediaStore on Android 10+ (no
+storage permission) and a legacy write on Android 9
+(`WRITE_EXTERNAL_STORAGE`, `maxSdkVersion=28`).
+
+Permission added: `POST_NOTIFICATIONS` (runtime-requested once on Android 13+;
+the history works regardless of the answer). Implementation lives in
+`data/history/HistoryStore.kt`, `notify/Notifications.kt` +
+`NotificationActionReceiver.kt`, `data/export/ResponseExport.kt`, and
+`ui/HistoryScreen.kt`; the response flows from `Dispatcher` (now returns the
+full body + `Content-Type`) through `ShareViewModel.recordResponse()`.
 
 ---
 

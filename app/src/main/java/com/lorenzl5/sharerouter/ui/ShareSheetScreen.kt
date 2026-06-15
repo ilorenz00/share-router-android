@@ -19,10 +19,13 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Videocam
+import android.widget.Toast
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,12 +34,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.lorenzl5.sharerouter.data.InputKind
 import com.lorenzl5.sharerouter.data.SharedContent
+import com.lorenzl5.sharerouter.data.export.ResponseExport
+import com.lorenzl5.sharerouter.data.export.mimeFor
+import com.lorenzl5.sharerouter.data.export.suggestedFileName
+import com.lorenzl5.sharerouter.data.history.ResponseRecord
+import com.lorenzl5.sharerouter.data.net.DispatchResult
 import com.lorenzl5.sharerouter.data.openapi.Endpoint
 
 @Composable
@@ -102,12 +111,7 @@ fun ShareSheetScreen(
                     }
                 }
 
-                is ShareUiState.Done -> StatusBlock(
-                    title = if (s.result.ok) "✓ ${s.endpoint.title}" else "✗ ${s.endpoint.title}",
-                    body = s.result.message,
-                    actionLabel = "Done",
-                    onAction = onDismiss,
-                )
+                is ShareUiState.Done -> DoneBlock(s.endpoint, s.result, onDismiss)
             }
         }
     }
@@ -179,6 +183,56 @@ private fun EndpointCard(ep: Endpoint, onClick: () -> Unit) {
                 }
             }
             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** Terminal "response received" state: shows the body with Copy / Save / Done. */
+@Composable
+private fun DoneBlock(endpoint: Endpoint, result: DispatchResult, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val body = result.body.ifBlank { result.message }
+    Column {
+        Text(
+            text = (if (result.ok) "✓ " else "✗ ") + endpoint.title + " · HTTP " + result.code,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.size(8.dp))
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 10,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.size(16.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(onClick = {
+                ResponseExport.copyToClipboard(context, "API response", body)
+                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+            }) { Text("Copy") }
+            OutlinedButton(onClick = {
+                val record = ResponseRecord(
+                    id = "", timestamp = System.currentTimeMillis(),
+                    endpointTitle = endpoint.title, requestSummary = "",
+                    httpCode = result.code, ok = result.ok,
+                    body = body, contentType = result.contentType,
+                )
+                val name = ResponseExport.saveToDownloads(
+                    context, suggestedFileName(record), body, mimeFor(record),
+                )
+                Toast.makeText(
+                    context,
+                    if (name != null) "Saved to Downloads/$name" else "Save failed",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }) { Text("Save") }
+            Spacer(Modifier.weight(1f))
+            Button(onClick = onDismiss) { Text("Done") }
         }
     }
 }

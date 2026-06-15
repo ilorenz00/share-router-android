@@ -21,7 +21,15 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class DispatchResult(val ok: Boolean, val code: Int, val message: String)
+data class DispatchResult(
+    val ok: Boolean,
+    val code: Int,
+    /** Short human-readable status for the share sheet. */
+    val message: String,
+    /** Full response body, surfaced in the notification and history. */
+    val body: String = "",
+    val contentType: String? = null,
+)
 
 /** Builds and sends the chosen shared content to a matched [Endpoint]. */
 class Dispatcher(
@@ -55,15 +63,19 @@ class Dispatcher(
 
         try {
             client.newCall(request).execute().use { resp ->
-                val msg = resp.body?.string()?.take(280).orEmpty()
+                val bodyStr = resp.body?.string().orEmpty()
+                val contentType = resp.header("Content-Type")
                 DispatchResult(
                     ok = resp.isSuccessful,
                     code = resp.code,
-                    message = if (resp.isSuccessful) "Sent — HTTP ${resp.code}" else "HTTP ${resp.code}: $msg",
+                    message = if (resp.isSuccessful) "Sent — HTTP ${resp.code}"
+                    else "HTTP ${resp.code}: ${bodyStr.take(280)}",
+                    body = bodyStr,
+                    contentType = contentType,
                 )
             }
         } catch (e: Exception) {
-            DispatchResult(false, 0, e.message ?: "Network error")
+            DispatchResult(false, 0, e.message ?: "Network error", body = e.message ?: "Network error")
         }
     }
 

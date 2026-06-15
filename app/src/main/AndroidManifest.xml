@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Notify with the API response (runtime-requested on Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- "Save to Downloads" on API ≤28 only; API 29+ uses MediaStore (no permission). -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <!-- usesCleartextTraffic: LAN/homelab tool — the MasterAPI may be reached over
          plain http on the local network (and 10.0.2.2 during emulator testing). -->
@@ -24,6 +30,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Response history (opened from settings or a notification tap) -->
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false"
+            android:label="History" />
+
+        <!-- Copy / Save actions on the response notification -->
+        <receiver
+            android:name=".notify.NotificationActionReceiver"
+            android:exported="false" />
 
         <!-- Share target: accepts every MIME type via SEND / SEND_MULTIPLE -->
         <!-- No singleTask: each share must get a fresh activity + ViewModel. A reused

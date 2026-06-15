@@ -3,15 +3,20 @@ package com.lorenzl5.sharerouter
 import android.app.Application
 import android.content.Context
 import com.lorenzl5.sharerouter.data.auth.AuthManager
+import com.lorenzl5.sharerouter.data.history.HistoryStore
 import com.lorenzl5.sharerouter.data.net.Dispatcher
 import com.lorenzl5.sharerouter.data.openapi.OpenApiFetcher
 import com.lorenzl5.sharerouter.data.settings.SettingsStore
+import com.lorenzl5.sharerouter.notify.Notifications
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 /** Tiny manual DI container — avoids pulling in a DI framework for a single-screen app. */
 class AppContainer(context: Context) {
+    /** Process-wide context for notifications, clipboard and history persistence. */
+    val appContext: Context = context.applicationContext
+
     val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -26,6 +31,11 @@ class AppContainer(context: Context) {
     val auth = AuthManager(context, http)
     val fetcher = OpenApiFetcher(http, json)
     val dispatcher = Dispatcher(http, context.contentResolver)
+    val history = HistoryStore(appContext)
+
+    init {
+        Notifications.ensureChannel(appContext)
+    }
 }
 
 class ShareRouterApp : Application() {
