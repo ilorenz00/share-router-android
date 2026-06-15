@@ -205,6 +205,15 @@ private fun DoneBlock(endpoint: Endpoint, result: DispatchResult, onDismiss: () 
             text = (if (result.ok) "✓ " else "✗ ") + endpoint.title + " · HTTP " + result.code,
             style = MaterialTheme.typography.titleMedium,
         )
+        if (result.uploadBytes >= 0) {
+            Text(
+                text = "↑ hochgeladen: " + formatBytes(result.uploadBytes) +
+                    if (result.uploadBytes == 0) " — leer! (Bild nicht lesbar)" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (result.uploadBytes == 0) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.size(8.dp))
         Text(
             text = body,
@@ -264,6 +273,12 @@ private fun Centered(content: @Composable () -> Unit) {
         Modifier.fillMaxWidth().padding(24.dp),
         horizontalArrangement = Arrangement.Center,
     ) { content() }
+}
+
+private fun formatBytes(n: Int): String = when {
+    n >= 1_000_000 -> "%.1f MB".format(n / 1_000_000.0)
+    n >= 1_000 -> "%.0f KB".format(n / 1000.0)
+    else -> "$n B"
 }
 
 private fun iconFor(kind: InputKind?) = when (kind) {

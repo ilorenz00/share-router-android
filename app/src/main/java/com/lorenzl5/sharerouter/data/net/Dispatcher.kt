@@ -31,6 +31,8 @@ data class DispatchResult(
     /** Full response body, surfaced in the notification and history. */
     val body: String = "",
     val contentType: String? = null,
+    /** Bytes of the payload the app actually uploaded (-1 = unknown). Diagnostic. */
+    val uploadBytes: Int = -1,
 )
 
 /** Builds and sends the chosen shared content to a matched [Endpoint]. */
@@ -47,8 +49,13 @@ class Dispatcher(
         val item = content.firstItemOfKind(endpoint.accepts)
             ?: return@withContext DispatchResult(false, 0, "No shareable item matched this endpoint")
 
+        var uploadBytes = -1
         val (url, body) = when (endpoint.style) {
-            RequestStyle.MULTIPART -> joinUrl(baseUrl, endpoint.path) to multipartBody(endpoint, item)
+            RequestStyle.MULTIPART -> {
+                val (mb, n) = multipartBody(endpoint, item)
+                uploadBytes = n
+                joinUrl(baseUrl, endpoint.path) to mb
+            }
             RequestStyle.JSON -> joinUrl(baseUrl, endpoint.path) to jsonBody(endpoint, item, wrapInArray = false)
             RequestStyle.JSON_ARRAY -> joinUrl(baseUrl, endpoint.path) to jsonBody(endpoint, item, wrapInArray = true)
             RequestStyle.TEXT_PLAIN -> joinUrl(baseUrl, endpoint.path) to
@@ -74,28 +81,34 @@ class Dispatcher(
                     else "HTTP ${resp.code}: ${bodyStr.take(280)}",
                     body = bodyStr,
                     contentType = contentType,
+                    uploadBytes = uploadBytes,
                 )
             }
         } catch (e: Exception) {
-            DispatchResult(false, 0, e.message ?: "Network error", body = e.message ?: "Network error")
+            DispatchResult(false, 0, e.message ?: "Network error", body = e.message ?: "Network error", uploadBytes = uploadBytes)
         }
     }
 
-    private fun multipartBody(endpoint: Endpoint, item: SharedItem): RequestBody {
+    /** Returns the multipart body plus the number of payload bytes uploaded. */
+    private fun multipartBody(endpoint: Endpoint, item: SharedItem): Pair<RequestBody, Int> {
         val builder = MultipartBody.Builder().setType(MultipartBody.FORM)
         endpoint.defaults.forEach { (k, v) -> builder.addFormDataPart(k, v) }
 
+        val payloadBytes: Int
         if (item.uri != null) {
             val bytes = readBytes(item.uri)
+            payloadBytes = bytes.size
             val mime = concreteMime(item)
             val filename = fileNameFor(item.uri, mime)
             val media = (mime ?: "application/octet-stream").toMediaTypeOrNull()
                 ?: "application/octet-stream".toMediaType()
             builder.addFormDataPart(endpoint.payloadField, filename, bytes.toRequestBody(media))
         } else {
-            builder.addFormDataPart(endpoint.payloadField, item.text ?: "")
+            val text = item.text ?: ""
+            payloadBytes = text.toByteArray().size
+            builder.addFormDataPart(endpoint.payloadField, text)
         }
-        return builder.build()
+        return builder.build() to payloadBytes
     }
 
     /**
