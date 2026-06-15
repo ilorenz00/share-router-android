@@ -161,9 +161,25 @@ class Dispatcher(
         return httpUrl.toString()
     }
 
-    private fun readBytes(uri: Uri): ByteArray =
-        resolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: error("Could not read shared file")
+    /**
+     * Read the shared content's bytes. Primary path is openInputStream; some gallery
+     * and cloud document providers return an *empty* stream there but read fine via an
+     * asset file descriptor, so fall back to that. Never returns empty bytes — an
+     * empty/unreadable share throws (so the user gets a clear error instead of the
+     * MasterAPI silently receiving a 0-byte file and replying "no image").
+     */
+    private fun readBytes(uri: Uri): ByteArray {
+        runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }
+            .getOrNull()?.takeIf { it.isNotEmpty() }?.let { return it }
+
+        runCatching {
+            resolver.openAssetFileDescriptor(uri, "r")?.use { afd ->
+                afd.createInputStream().use { it.readBytes() }
+            }
+        }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { return it }
+
+        error("Geteilte Datei konnte nicht gelesen werden oder war leer ($uri)")
+    }
 
     private fun displayName(uri: Uri): String? =
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
