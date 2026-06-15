@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
+import android.webkit.MimeTypeMap
 import com.lorenzl5.sharerouter.data.InputKind
 import com.lorenzl5.sharerouter.data.SharedContent
 import com.lorenzl5.sharerouter.data.SharedItem
@@ -13,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -85,13 +87,43 @@ class Dispatcher(
 
         if (item.uri != null) {
             val bytes = readBytes(item.uri)
-            val filename = displayName(item.uri) ?: "shared"
-            val media = (item.mimeType ?: "application/octet-stream").toMediaType()
+            val mime = concreteMime(item)
+            val filename = fileNameFor(item.uri, mime)
+            val media = (mime ?: "application/octet-stream").toMediaTypeOrNull()
+                ?: "application/octet-stream".toMediaType()
             builder.addFormDataPart(endpoint.payloadField, filename, bytes.toRequestBody(media))
         } else {
             builder.addFormDataPart(endpoint.payloadField, item.text ?: "")
         }
         return builder.build()
+    }
+
+    /**
+     * A concrete MIME type — never null/blank and never a wildcard subtype (an
+     * "image" type with a star subtype), which okhttp's toMediaType() rejects.
+     * Falls back to the ContentResolver, which returns the precise type for
+     * MediaStore / gallery URIs.
+     */
+    private fun concreteMime(item: SharedItem): String? {
+        val declared = item.mimeType?.substringBefore(';')?.trim()
+        if (declared != null && declared.contains('/') && !declared.endsWith("/*")) return declared
+        val uri = item.uri ?: return declared
+        return resolver.getType(uri)?.takeIf { it.contains('/') && !it.endsWith("/*") } ?: declared
+    }
+
+    /**
+     * A filename that carries a real extension. The MasterAPI re-forwards uploads as
+     * `application/octet-stream` (Go's `CreateFormFile`), so the downstream OCR/vision
+     * service detects the image from the **filename extension**. A gallery URI whose
+     * DISPLAY_NAME lacks an extension (Google Photos etc.) would otherwise be rejected
+     * as "no image" — so derive the extension from the MIME type when missing.
+     */
+    private fun fileNameFor(uri: Uri, mime: String?): String {
+        val raw = displayName(uri)?.trim().orEmpty()
+        val hasExt = raw.substringAfterLast('.', "").length in 1..5
+        if (raw.isNotEmpty() && hasExt) return raw
+        val ext = mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+        return raw.ifEmpty { "shared" } + (ext?.let { ".$it" } ?: "")
     }
 
     private fun jsonBody(endpoint: Endpoint, item: SharedItem, wrapInArray: Boolean): RequestBody {
